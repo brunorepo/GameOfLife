@@ -51,30 +51,27 @@ void set_dead(char *matrix_vector, int x, int y) {    // implement this in set m
 	matrix_vector[get_index(x, y,ROW,COL)] = DEAD;
 }
 
-void screen(char *matrix_vector) {
+void screen(char *matrix_vector, int maxRow, int maxCol) {
 	
 	printf("\x1b[3J\x1b[H\x1b[2J"); // Clear screen.
 	for (int i=0; i<ROW; i++) {
 		for (int j=0; j<COL; j++) {
-			printf("%c ", matrix_vector[get_index(i,j,ROW,COL)]);
+			printf("%c ", matrix_vector[get_index(i,j,maxRow,maxCol)]);
 		}
 		printf("\n");
 	}
 }
 
-int counting_neigh(char *matrix_vector, int index) {
+int counting_neigh(char *matrix_vector, int row, int col) {
 	int count = 0;
-	if (matrix_vector[index-1] == ALIVE) count++;
-	if (matrix_vector[index+1] == ALIVE) count++;
-	index -=COL;
-	for (int i=-1; i<=1; i++) {
-		if (matrix_vector[index+i] == ALIVE) count++;
-	}	
-	index +=2*COL;
+	if ( matrix_vector[get_index(row,col,ROW,COL)] == ALIVE ) count--;
+	for (int i=-1; i <= 1; i++) {
+		for (int j=-1; j <= 1; j++) {
+			if ( matrix_vector[get_index(row+i,col+j,ROW,COL)] == ALIVE ) count++;
+		}
 
-	for (int i=-1; i<=1; i++) {
-		if (matrix_vector[index+i] == ALIVE) count++;
-	}	
+	}
+
 	return count;
 }
 
@@ -82,31 +79,31 @@ void compute_new_state(char *matrix_vector) {
 	int alive;                                           //Rethink this one
 	int current;
 	char new_matrix[DIMENSION];
-	int index;
+	for (int i=0; i<ROW; i++) {
+		for (int j=0; j<COL; j++) {
 
-	for (int i=0; i<DIMENSION; i++) {
-		current = matrix_vector[i];
-		alive = counting_neigh(matrix_vector, i);
-		new_matrix[i] = DEAD;
-		if (current == ALIVE) {
-			if (alive == 2 || alive == 3) {
-				new_matrix[i] = ALIVE;
+			current = matrix_vector[get_index(i,j,ROW,COL)];
+			alive = counting_neigh(matrix_vector, i,j );
+			new_matrix[get_index(i,j,ROW,COL)] = DEAD;
+			if (current == ALIVE) {
+				if (alive == 2 || alive == 3) {
+					new_matrix[get_index(i,j,ROW,COL)] = ALIVE;
+				}
+			}
+			if (current == DEAD) {
+				if (alive == 3) {
+					new_matrix[get_index(i,j,ROW,COL)] = ALIVE;
+				}
 			}
 		}
-		if (current == DEAD) {
-			if (alive == 3) {
-				new_matrix[i] = ALIVE;
-			}
-		}
-
-		}
+	}
 
 	
 
 	for (int i=0; i<DIMENSION; i++) {
-			matrix_vector[i] = new_matrix[i];
+		matrix_vector[i] = new_matrix[i];
 	}
-	screen(matrix_vector);
+	screen(matrix_vector,ROW,COL);
 }
 
 struct termios original_mode;
@@ -130,7 +127,7 @@ void read_cursor(char *matrix_vector){
 	int curs_x = 0;
 	int curs_y = 0;
 
-	screen(matrix_vector);
+	screen(matrix_vector,ROW,COL);
 	
 	char old_state = DEAD ;
 	while (read(STDIN_FILENO, &c, 1) == 1) {
@@ -149,12 +146,12 @@ void read_cursor(char *matrix_vector){
 		}
 		old_state = matrix_vector[get_index(curs_x,curs_y,ROW,COL)];
 		set_matrix(matrix_vector, curs_x, curs_y, 1);
-		screen(matrix_vector);
+		screen(matrix_vector,ROW,COL);
 
 	}	
 }
 
-void read_file() {
+void read_file(char *matrix_vector) {
 	char matrix_read[38*38];
 	init_matrix(matrix_read, DEAD,38, 38);
 	FILE *fptr = fopen("pattern.txt","r");
@@ -173,26 +170,44 @@ void read_file() {
 	
 	fclose(fptr);
 
-	printf("\x1b[3J\x1b[H\x1b[2J"); // Clear screen.
 	for (int i=0; i<38; i++) {
 		for (int j=0; j<38; j++) {
-			printf("%c ", matrix_read[get_index(i,j,38,38)]);
+			matrix_vector[get_index(i,j,ROW,COL)] =  matrix_read[get_index(i,j,38,38)];
 		}
-		printf("\n");
 	}
-
+	screen(matrix_vector,ROW,COL);
 }
+
+void save_config(char *matrix_vector){
+	FILE *fptr = fopen("logConfig.txt","w");
+	if (!fptr) {
+		perror("Error opening file");
+		return;
+	}
+	
+	for(int i=0; i<ROW; i++) {
+		for(int j=0; j<COL; j++) {
+			fprintf(fptr,"%c",matrix_vector[get_index(i,j,ROW,COL)]);
+		}
+		fprintf(fptr,"\n");
+	}
+	fclose(fptr);
+}
+
 
 int main(void) {
 	
 	char matrix_vector[DIMENSION];
 	init_matrix( matrix_vector, DEAD,ROW,COL);
-	//read_cursor(matrix_vector);
+	printf("Read from file?\n");
+	char answer;
+	read(STDIN_FILENO,&answer,1);
+	if (answer  == 'y') read_file(matrix_vector);
+	else read_cursor(matrix_vector);
+	save_config(matrix_vector);
 	while (1) {
-		read_file();
-		//compute_new_state(matrix_vector);
-		//usleep(250000);
-		sleep(2);
+		compute_new_state(matrix_vector);
+		usleep(200000);
 	}
 	
 
