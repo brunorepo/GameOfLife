@@ -3,11 +3,11 @@
 #include <termios.h>
 #include <stdlib.h>
 
-#define COL 80
-#define ROW 80
+#define COL 50
+#define ROW 50
 #define DIMENSION (ROW*COL)
 #define DEAD ' '
-#define ALIVE '+'
+#define ALIVE 'o'
 #define CURSOR '*'
 
 
